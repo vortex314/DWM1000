@@ -106,7 +106,7 @@ static const struct {
 };
 
 extern void dwt_isr();
-
+/*
 #include <DWM1000/DWM1000_Anchor.h>
 void dwt_isr_void(void* obj)
 {
@@ -115,7 +115,7 @@ void dwt_isr_void(void* obj)
     ptr->_interruptStart = Sys::micros();
     dwt_isr();
     portEXIT_CRITICAL();
-}
+}*/
 
 void DWM1000::setup()
 {
@@ -127,7 +127,7 @@ void DWM1000::setup()
     _spi.setLsbFirst(false);
     _spi.init();
 
-    _irq.onChange(DigitalIn::DIN_RAISE,dwt_isr_void,this);
+//    _irq.onChange(DigitalIn::DIN_RAISE,dwt_isr_void,this);
     _irq.init();
     _reset.init();
 

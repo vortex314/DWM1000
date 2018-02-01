@@ -92,7 +92,7 @@ DWM1000_Anchor* DWM1000_Anchor::_anchor;
 
 void interruptHandler(void* obj){
       DWM1000_Anchor* ptr=(DWM1000_Anchor*)obj;
-    ptr->signal(SIG_INTERRUPT);
+    ptr->signalFromIsr(SIG_INTERRUPT);
     ptr->_interruptStart = Sys::micros();
 }
 
@@ -118,7 +118,7 @@ DWM1000_Anchor::DWM1000_Anchor(const char* name,Spi& spi, DigitalIn& irq,Digital
     _anchor = this;
     _hasIrqEvent = false;
     _state = RCV_ANY;
-//    irq.onChange(DigitalIn::DIN_RAISE,interruptHandler,this);
+    irq.onChange(DigitalIn::DIN_RAISE,interruptHandler,this);
 //    new PropertyReference<float>("dwm1000/distance",distanceProp,1000);
 }
 
@@ -170,9 +170,6 @@ void DWM1000_Anchor::run()
     INFO(" anchor >>> ");
     static uint32_t oldInterrupts;
     uint32_t sys_mask, sys_status, sys_state;
-    static uint32_t oldFinals = 0;
-
-
 
 INIT: {
         _blinkTimer.reset();
@@ -207,13 +204,6 @@ ENABLE : {
             INFO(
                 " interrupts : %d blinks : %d polls : %d resps : %d finals :%d heap : %d dist : %f",
                 _interrupts, _blinks, _polls, _resps, _finals,Sys::getFreeHeap(),_distance);
-
-            if (_finals != oldFinals) {
-                oldFinals = _finals;
-                /*     eb.publicEvent(id(), H("distance")).addKeyValue(EB_DATA,
-                             distance);
-                     eb.send();*/
-            }
 
         }
     }
