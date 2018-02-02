@@ -44,10 +44,13 @@ RemoteAnchor* anchorsNew(uint16_t address,uint32_t  sequence)
         if ( anchors[i]._address==0) {
             anchors[i]._address=address;
             anchors[i]._sequence=sequence;
+            anchors[i]._expires=Sys::millis()+10000;
             return &anchors[i];
         }
     anchors[0]._sequence=sequence;
     anchors[0]._address=address;
+    anchors[0]._sequence=sequence;
+    anchors[0]._expires=Sys::millis()+10000;
     return &anchors[0];
 }
 
@@ -88,25 +91,42 @@ static void final_msg_set_ts(uint8 *ts_field, uint64 ts);
 //Timer rxcallbackTime("rxcallback time", 10);
 //Metric<uint32_t> frame_length("frame_length ", 10);
 
+enum {
+    SIG_MESSAGE,
+    SIG_INTERRUPT
+};
+static const char* role="T";
+
+void tagInterruptHandler(void* obj)
+{
+    DWM1000_Tag* ptr=(DWM1000_Tag*)obj;
+    ptr->signalFromIsr(SIG_INTERRUPT);
+    ptr->_interruptStart = Sys::micros();
+}
 
 
 
 DWM1000_Tag* DWM1000_Tag::_tag = 0;
 
 DWM1000_Tag::DWM1000_Tag(const char* name,Spi& spi,DigitalIn& irq,DigitalOut& reset) :
-    VerticleCoRoutine(name),DWM1000( spi,irq,reset),
+    VerticleTask(name,500,16),DWM1000( spi,irq,reset),
 //int pin = 5;   // RESET PIN == D1 == GPIO5
     // PIN_IRQ_IN 4// PIN == D2 == GPIO4
     _anchors(20), _panAddress(3),_pollTimer(300)
 {
-    _count = 0;
-    _tag = this;
-    _interrupts = 0;
-    _resps = 0;
-    _polls = 0;
-
     _state = RCV_ANY;
 
+    _count = 0;
+    _interrupts = 0;
+    _polls = 0;
+    _finals = 0;
+    _blinks=0;
+    _resps=0;
+    _errs=0;
+    _missed=0;
+    _state = RCV_ANY;
+    _tag=this;
+    irq.onChange(DigitalIn::DIN_RAISE,tagInterruptHandler,this);
 
 }
 
@@ -205,6 +225,7 @@ void DWM1000_Tag::expireAnchors()
     for(uint32_t i=0; i<MAX_ANCHORS; i++)
         if ( anchors[i]._address!=0) {
             if ( anchors[i].expired()) {
+                INFO(" expire anchor : %X ", anchors[i]._address);
                 anchors[i].remove();
             }
         }
@@ -251,7 +272,7 @@ WAIT_RXD: {
                     handleBlinkMsg();
                     _blinks++;
                 } else {
-                    WARN(" unexpected frame type %s",UID.label(ft));
+ //                   WARN(" unexpected frame type %s",UID.label(ft));
                 }
             } else if (signal->event == DWT_SIG_RX_TIMEOUT) {
                 if (_pollTimer.expired()) {
@@ -314,7 +335,6 @@ void DWM1000_Tag::txcallback(const dwt_callback_data_t* signal)
 {
     _tag->_interrupts++;
     _tag->FSM(signal);
-
 }
 
 FrameType DWM1000_Tag::readMsg(const dwt_callback_data_t* signal)
@@ -349,55 +369,47 @@ FrameType DWM1000_Tag::readMsg(const dwt_callback_data_t* signal)
         return FT_UNKNOWN;
     }
 }
-enum {
-    SIG_MESSAGE
-};
-static const char* role="T";
+
 
 void DWM1000_Tag::start()
 {
 //_________________________________________________INIT SPI ESP8266
-    dwt_setcallbacks(txcallback, rxcallback);
+
     DWM1000::setup();
     INFO("DWM1000 TAG started.");
+    dwt_setcallbacks(txcallback, rxcallback);
 
     dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-
-
     dwt_setdblrxbuffmode(false);
     dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFTO, 1);  // enable
 
+    _count = 0;
     eb.on(name(),[this](Message& msg) {
         signal(SIG_MESSAGE);
     });
 
-    _count = 0;
-    timeout(5000);
-
     new PropertyReference<const char*>("dwm1000/role",role,  20000);
     new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  20000);
     new PropertyReference<uint32_t>("dwm1000/polls",_polls,  20000);
-    new PropertyReference<uint32_t>("dwm1000/response",_resps,  20000);
+    new PropertyReference<uint32_t>("dwm1000/responses",_resps,  20000);
     new PropertyReference<uint32_t>("dwm1000/finals",_finals,  20000);
     new PropertyReference<uint32_t>("dwm1000/blinks",_blinks,  20000);
+    new PropertyReference<uint32_t>("dwm1000/interruptDelay",_interruptDelay,  1000);
+    new PropertyReference<uint32_t>("dwm1000/count",_count,  20000);
+    new PropertyReference<uint32_t>("dwm1000/errs",_errs,  20000);
+    new PropertyReference<uint32_t>("dwm1000/missed",_missed,  20000);
 
 //   _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  1000);
-    VerticleCoRoutine::start();
+//      _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  60000);
+    VerticleTask::start();
 }
 
-void DWM1000_Tag::loop()
-{
-    /*   if ( digitalRead(DWM_PIN_IRQ)) {
-           dwt_isr();
-       }*/
-}
 
 void DWM1000_Tag::run()
 {
     Bytes bytes(0);
     uint32_t sys_mask, sys_status, sys_state;
-    static uint32_t oldInterrupts;
-    PT_BEGIN()
+    static uint32_t oldInterrupts=0;
 
 INIT: {
         _pollTimer.reset();
@@ -405,11 +417,16 @@ INIT: {
         dwt_setrxtimeout(5000);
         dwt_rxenable(0);
         oldInterrupts=_interrupts;
-        PT_WAIT_SIGNAL(1000);
     }
 ENABLE : {
         while(true) {
-            PT_WAIT_SIGNAL(1000);
+            expireAnchors();
+            waitSignal(1000);
+            if ( hasSignal(SIG_INTERRUPT)) {
+                _interruptDelay = Sys::micros()-_interruptStart;
+                dwt_isr();
+                continue;
+            }
             if ( oldInterrupts == _interrupts) {
                 sys_mask = dwt_read32bitreg(SYS_MASK_ID);
                 sys_status = dwt_read32bitreg(SYS_STATUS_ID);
@@ -422,7 +439,7 @@ ENABLE : {
                 dwt_setrxtimeout(60000);
                 dwt_rxenable(0);
             }
-            expireAnchors();
+
             oldInterrupts = _interrupts;
             INFO(
                 " interrupts : %d blinks : %d polls : %d resps : %d finals :%d heap : %d",
@@ -430,9 +447,6 @@ ENABLE : {
         }
     }
 
-    PT_END();
-    goto INIT; // just to silence compiler
-    goto ENABLE;
 }
 
 /*! ------------------------------------------------------------------------------------------------------------------

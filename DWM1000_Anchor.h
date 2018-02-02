@@ -23,7 +23,7 @@ class DWM1000_Anchor: public VerticleTask,public DWM1000
     uint32_t _resps;
     uint32_t _errs;
     uint32_t _missed;
-    
+
     uint32_t _interruptDelay;
 
 
@@ -53,21 +53,17 @@ class DWM1000_Anchor: public VerticleTask,public DWM1000
 
 
 public:
-uint64_t _interruptStart;
+    uint64_t _interruptStart;
     DWM1000_Anchor(const char* name,Spi& spi,DigitalIn& irq,DigitalOut& reset);
-     ~DWM1000_Anchor();
+    ~DWM1000_Anchor();
     void mode(uint32_t m);
     void start();
-//    void resetChip();
-//    void initSpi();
     void run();
-//    void enableIsr();
 
     void sendReply();
     void calcFinalMsg();
     int sendRespMsg();
 
-    void loop();
     void update(uint16_t srcAddress,uint8_t sequence);
     static void rxcallback(const  dwt_callback_data_t* event) ;
     static void txcallback(const  dwt_callback_data_t* event) ;

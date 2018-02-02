@@ -119,6 +119,15 @@ void dwt_isr_void(void* obj)
 
 void DWM1000::setup()
 {
+    
+    UID.add("FT_BLINK");
+    UID.add("FT_POLL");
+    UID.add("FT_RESP");
+    UID.add("FT_FINAL");
+    UID.add("FT_UNKNOWN");
+    UID.add("RCV_ANY");
+        UID.add("RCV_RESP");
+        UID.add("SND_FINAL");
 //_________________________________________________INIT SPI, IRQ,RESET  DWM1000
     spi_set_global(&_spi);  // to support deca spi routines, to handle also irq's
     _spi.setClock(Spi::SPI_CLOCK_500K);

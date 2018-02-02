@@ -90,8 +90,9 @@ void logAnchor(const char* s, uint32_t state, uint8_t* buffer,
 }
 DWM1000_Anchor* DWM1000_Anchor::_anchor;
 
-void interruptHandler(void* obj){
-      DWM1000_Anchor* ptr=(DWM1000_Anchor*)obj;
+void anchorInterruptHandler(void* obj)
+{
+    DWM1000_Anchor* ptr=(DWM1000_Anchor*)obj;
     ptr->signalFromIsr(SIG_INTERRUPT);
     ptr->_interruptStart = Sys::micros();
 }
@@ -118,7 +119,7 @@ DWM1000_Anchor::DWM1000_Anchor(const char* name,Spi& spi, DigitalIn& irq,Digital
     _anchor = this;
     _hasIrqEvent = false;
     _state = RCV_ANY;
-    irq.onChange(DigitalIn::DIN_RAISE,interruptHandler,this);
+    irq.onChange(DigitalIn::DIN_RAISE,anchorInterruptHandler,this);
 //    new PropertyReference<float>("dwm1000/distance",distanceProp,1000);
 }
 
@@ -136,7 +137,7 @@ void DWM1000_Anchor::start()
     dwt_setcallbacks(txcallback, rxcallback);
     dwt_setdblrxbuffmode(false);
     dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_BEACON_EN);
-    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFTO  , 1);  // enable
+    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFTO, 1);    // enable
 
     /* Set expected response's delay and timeout. See NOTE 4 and 5 below.
      * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
@@ -152,7 +153,7 @@ void DWM1000_Anchor::start()
     new PropertyReference<const char*>("dwm1000/role",role,  20000);
     new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  20000);
     new PropertyReference<uint32_t>("dwm1000/polls",_polls,  20000);
-    new PropertyReference<uint32_t>("dwm1000/response",_resps,  20000);
+    new PropertyReference<uint32_t>("dwm1000/responses",_resps,  20000);
     new PropertyReference<uint32_t>("dwm1000/finals",_finals,  20000);
     new PropertyReference<uint32_t>("dwm1000/blinks",_blinks,  20000);
     new PropertyReference<uint32_t>("dwm1000/interruptDelay",_interruptDelay,  1000);
@@ -177,7 +178,6 @@ INIT: {
         dwt_setrxtimeout(0);
         dwt_rxenable(0);
         oldInterrupts=_interrupts;
-        waitSignal(1000);
     }
 ENABLE : {
         while(true) {
@@ -198,17 +198,16 @@ ENABLE : {
                 WARN(" enable RXD ");
                 dwt_setrxtimeout(60000);
                 dwt_rxenable(0);
+                if ( _irq.read() ) {
+                    dwt_isr();
+                }
             }
             oldInterrupts = _interrupts;
-
             INFO(
                 " interrupts : %d blinks : %d polls : %d resps : %d finals :%d heap : %d dist : %f",
                 _interrupts, _blinks, _polls, _resps, _finals,Sys::getFreeHeap(),_distance);
-
         }
     }
-
-
 }
 
 void DWM1000_Anchor::sendBlinkMsg()
@@ -276,7 +275,7 @@ void DWM1000_Anchor::calcFinalMsg()
     tof = tof_dtu * DWT_TIME_UNITS;
     distance = tof * SPEED_OF_LIGHT;
     _distance = distance * 100.0;
-  if ( _distanceProp) _distanceProp->updated();
+    if ( _distanceProp) _distanceProp->updated();
     /*    INFO(" >>>>>>>>> distance : %f for TAG : %X ", distance,
              (_finalMsg.src[0] << 8) + _finalMsg.src[1]); */
 
@@ -419,12 +418,7 @@ void DWM1000_Anchor::txcallback(const dwt_callback_data_t* signal)
 
 
 
-void DWM1000_Anchor::loop()
-{
-    /*   if ( digitalRead(DWM_PIN_IRQ)) {
-           dwt_isr();
-       }*/
-}
+
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn get_tx_timestamp_u64()
