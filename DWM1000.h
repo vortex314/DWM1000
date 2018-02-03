@@ -106,6 +106,7 @@ public:
     DWM1000(Spi& spi,DigitalIn& irq,DigitalOut& reset);
     virtual ~DWM1000();
     void mode(uint32_t m);
+    void init();
     void setup();
     void resetChip();
 

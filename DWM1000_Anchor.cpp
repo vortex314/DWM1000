@@ -128,23 +128,26 @@ DWM1000_Anchor::~DWM1000_Anchor()
 
 }
 
+void DWM1000_Anchor::init()
+{
+    dwt_setcallbacks(txcallback, rxcallback);
+    dwt_setdblrxbuffmode(false);
+    dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_BEACON_EN);
+    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFCE | DWT_INT_RFTO, 1);    // enable
+}
+
 void DWM1000_Anchor::start()
 {
 //_________________________________________________INIT SPI ESP8266
 
     DWM1000::setup();
     INFO("DWM1000 ANCHOR started.");
-    dwt_setcallbacks(txcallback, rxcallback);
-    dwt_setdblrxbuffmode(false);
-    dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_BEACON_EN);
-    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFTO, 1);    // enable
+    init();
 
     /* Set expected response's delay and timeout. See NOTE 4 and 5 below.
      * As this example only handles one incoming frame with always the same delay and timeout, those values can be set here once for all. */
     /*    dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
      dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);*/
-
-    _count = 0;
 
     eb.on(name(),[this](Message& msg) {
         signal(SIG_MESSAGE);
@@ -160,9 +163,8 @@ void DWM1000_Anchor::start()
     new PropertyReference<uint32_t>("dwm1000/count",_count,  20000);
     new PropertyReference<uint32_t>("dwm1000/errs",_errs,  20000);
     new PropertyReference<uint32_t>("dwm1000/missed",_missed,  20000);
-
-
     _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  60000);
+    
     VerticleTask::start();
 }
 
@@ -170,14 +172,15 @@ void DWM1000_Anchor::run()
 {
     INFO(" anchor >>> ");
     static uint32_t oldInterrupts;
-    uint32_t sys_mask, sys_status, sys_state;
+    uint32_t sys_mask, sys_status, sys_state,retries;
 
 INIT: {
         _blinkTimer.reset();
         dwt_setautorxreenable(true);
-        dwt_setrxtimeout(0);
+        dwt_setrxtimeout(60000);
         dwt_rxenable(0);
         oldInterrupts=_interrupts;
+        retries=0;
     }
 ENABLE : {
         while(true) {
@@ -187,20 +190,37 @@ ENABLE : {
                 dwt_isr();
                 continue;
             }
+            sys_mask = dwt_read32bitreg(SYS_MASK_ID);
+            sys_status = dwt_read32bitreg(SYS_STATUS_ID);
+            sys_state = dwt_read32bitreg(SYS_STATE_ID);
+            if ( sys_state & 0x10000 ) { // IDLE
+                dwt_rxenable(0);
+            }
+            if ((sys_status & SYS_STATUS_SLP2INIT) && (oldInterrupts == _interrupts) ) {
+                retries++;
+                if ( retries == 10 ) {
+                    WARN(" Re-initializing DWM1000 ...")
+                    DWM1000::init();
+                    init();
+                    dwt_write32bitreg(SYS_STATUS_ID,SYS_STATUS_ALL_RX_GOOD | SYS_STATUS_ALL_RX_ERR);
+                    dwt_setautorxreenable(false);
+                    dwt_setrxtimeout(60000);
+                    dwt_rxenable(0);
+                    retries=0;
+                }
+            }
+
             if ( oldInterrupts == _interrupts) {
-                sys_mask = dwt_read32bitreg(SYS_MASK_ID);
-                sys_status = dwt_read32bitreg(SYS_STATUS_ID);
-                sys_state = dwt_read32bitreg(SYS_STATE_ID);
                 INFO(
                     " SYS_MASK : %X SYS_STATUS : %X SYS_STATE: %X state : %s IRQ : %d",
                     sys_mask, sys_status, sys_state, UID.label(_state),
                     _irq.read());
-                WARN(" enable RXD ");
-                dwt_setrxtimeout(60000);
+                dwt_setrxtimeout(0);
                 dwt_rxenable(0);
-                if ( _irq.read() ) {
-                    dwt_isr();
-                }
+
+            }
+            if ( _irq.read() ) {
+                dwt_isr();
             }
             oldInterrupts = _interrupts;
             INFO(

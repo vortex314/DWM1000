@@ -59,6 +59,7 @@ public:
     void mode(uint32_t m);
     void start();
     void run();
+    void init();
 
     void sendReply();
     void calcFinalMsg();

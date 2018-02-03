@@ -117,30 +117,8 @@ void dwt_isr_void(void* obj)
     portEXIT_CRITICAL();
 }*/
 
-void DWM1000::setup()
+void DWM1000::init()
 {
-    
-    UID.add("FT_BLINK");
-    UID.add("FT_POLL");
-    UID.add("FT_RESP");
-    UID.add("FT_FINAL");
-    UID.add("FT_UNKNOWN");
-    UID.add("RCV_ANY");
-        UID.add("RCV_RESP");
-        UID.add("SND_FINAL");
-//_________________________________________________INIT SPI, IRQ,RESET  DWM1000
-    spi_set_global(&_spi);  // to support deca spi routines, to handle also irq's
-    _spi.setClock(Spi::SPI_CLOCK_500K);
-    _spi.setHwSelect(true);
-    _spi.setMode(Spi::SPI_MODE_PHASE0_POL0);
-    _spi.setLsbFirst(false);
-    _spi.init();
-
-//    _irq.onChange(DigitalIn::DIN_RAISE,dwt_isr_void,this);
-    _irq.init();
-    _reset.init();
-
-
     resetChip();
 
     spi_set_rate_low();
@@ -196,9 +174,37 @@ void DWM1000::setup()
 
     dwt_setrxantennadelay(RX_ANT_DLY); /* Apply default antenna delay value. See NOTE 1 below. */
     dwt_settxantennadelay(TX_ANT_DLY);
+}
+
+void DWM1000::setup()
+{
+
+    UID.add("FT_BLINK");
+    UID.add("FT_POLL");
+    UID.add("FT_RESP");
+    UID.add("FT_FINAL");
+    UID.add("FT_UNKNOWN");
+    UID.add("RCV_ANY");
+    UID.add("RCV_RESP");
+    UID.add("SND_FINAL");
     config.setNameSpace("dwm1000");
     config.get("x",_x,1000);
     config.get("y",_y,2000);
+//_________________________________________________INIT SPI, IRQ,RESET  DWM1000
+    spi_set_global(&_spi);  // to support deca spi routines, to handle also irq's
+    _spi.setClock(Spi::SPI_CLOCK_500K);
+    _spi.setHwSelect(true);
+    _spi.setMode(Spi::SPI_MODE_PHASE0_POL0);
+    _spi.setLsbFirst(false);
+    _spi.init();
+
+//    _irq.onChange(DigitalIn::DIN_RAISE,dwt_isr_void,this); // has been set by anchor
+    _irq.init();
+    _reset.init();
+
+    init();
+
+
 }
 
 FrameType DWM1000::getFrameType(DwmMsg& msg)
