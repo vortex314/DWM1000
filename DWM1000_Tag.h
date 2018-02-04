@@ -110,6 +110,7 @@ public:
     ~DWM1000_Tag();
     void mode(uint32_t m);
     void start();
+    void init();
 
  //   void initSpi();
  //   bool isInterruptDetected();

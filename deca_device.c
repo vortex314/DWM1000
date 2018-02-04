@@ -2240,7 +2240,6 @@ IRAM void dwt_isr(void) // Assume interrupt can supply context
 	{
 		if((status & (SYS_STATUS_LDEDONE | SYS_STATUS_RXPHD | SYS_STATUS_RXSFDD)) != (SYS_STATUS_LDEDONE | SYS_STATUS_RXPHD | SYS_STATUS_RXSFDD))
 		{
-printf(" %s \n",__func__);
 			// Got LDE done but other flags SFD and PHR are clear - this is a bad frame - reset the transceiver
 			dwt_forcetrxoff(); //this will clear all events
 

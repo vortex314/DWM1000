@@ -272,9 +272,10 @@ WAIT_RXD: {
                     handleBlinkMsg();
                     _blinks++;
                 } else {
- //                   WARN(" unexpected frame type %s",UID.label(ft));
+//                   WARN(" unexpected frame type %s",UID.label(ft));
                 }
             } else if (signal->event == DWT_SIG_RX_TIMEOUT) {
+                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXRFTO); // Clear RX timeout event bit
                 if (_pollTimer.expired()) {
                     if (pollAnchors()) {
                         _polls++;
@@ -284,6 +285,7 @@ WAIT_RXD: {
                 }
             } else if (signal->event == DWT_SIG_TX_DONE  ) {
                 // apparently irq cannot be suppressed
+                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_TX); // Clear TX event bit
             } else {
                 WARN("unhandled event %d",signal->event);
             }
@@ -370,6 +372,14 @@ FrameType DWM1000_Tag::readMsg(const dwt_callback_data_t* signal)
     }
 }
 
+void DWM1000_Tag::init()
+{
+    dwt_setcallbacks(txcallback, rxcallback);
+    dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
+    dwt_setdblrxbuffmode(false);
+    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFTO, 1);  // enable
+}
+
 
 void DWM1000_Tag::start()
 {
@@ -377,27 +387,24 @@ void DWM1000_Tag::start()
 
     DWM1000::setup();
     INFO("DWM1000 TAG started.");
-    dwt_setcallbacks(txcallback, rxcallback);
+    init();
 
-    dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-    dwt_setdblrxbuffmode(false);
-    dwt_setinterrupt(DWT_INT_RFCG | DWT_INT_RFTO, 1);  // enable
 
     _count = 0;
     eb.on(name(),[this](Message& msg) {
         signal(SIG_MESSAGE);
     });
 
-    new PropertyReference<const char*>("dwm1000/role",role,  20000);
-    new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  20000);
-    new PropertyReference<uint32_t>("dwm1000/polls",_polls,  20000);
-    new PropertyReference<uint32_t>("dwm1000/responses",_resps,  20000);
-    new PropertyReference<uint32_t>("dwm1000/finals",_finals,  20000);
-    new PropertyReference<uint32_t>("dwm1000/blinks",_blinks,  20000);
+    new PropertyReference<const char*>("dwm1000/role",role,  5000);
+    new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  5000);
+    new PropertyReference<uint32_t>("dwm1000/polls",_polls,  5000);
+    new PropertyReference<uint32_t>("dwm1000/responses",_resps,  5000);
+    new PropertyReference<uint32_t>("dwm1000/finals",_finals,  5000);
+    new PropertyReference<uint32_t>("dwm1000/blinks",_blinks,  5000);
     new PropertyReference<uint32_t>("dwm1000/interruptDelay",_interruptDelay,  1000);
-    new PropertyReference<uint32_t>("dwm1000/count",_count,  20000);
-    new PropertyReference<uint32_t>("dwm1000/errs",_errs,  20000);
-    new PropertyReference<uint32_t>("dwm1000/missed",_missed,  20000);
+    new PropertyReference<uint32_t>("dwm1000/count",_count,  5000);
+    new PropertyReference<uint32_t>("dwm1000/errs",_errs,  5000);
+    new PropertyReference<uint32_t>("dwm1000/missed",_missed,  5000);
 
 //   _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  1000);
 //      _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  60000);
@@ -426,6 +433,9 @@ ENABLE : {
                 _interruptDelay = Sys::micros()-_interruptStart;
                 dwt_isr();
                 continue;
+            }
+            if ( _irq.read() ) {
+                dwt_isr();
             }
             if ( oldInterrupts == _interrupts) {
                 sys_mask = dwt_read32bitreg(SYS_MASK_ID);

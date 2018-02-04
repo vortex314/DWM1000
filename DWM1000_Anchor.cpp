@@ -153,25 +153,25 @@ void DWM1000_Anchor::start()
         signal(SIG_MESSAGE);
     });
 
-    new PropertyReference<const char*>("dwm1000/role",role,  20000);
-    new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  20000);
-    new PropertyReference<uint32_t>("dwm1000/polls",_polls,  20000);
-    new PropertyReference<uint32_t>("dwm1000/responses",_resps,  20000);
-    new PropertyReference<uint32_t>("dwm1000/finals",_finals,  20000);
-    new PropertyReference<uint32_t>("dwm1000/blinks",_blinks,  20000);
-    new PropertyReference<uint32_t>("dwm1000/interruptDelay",_interruptDelay,  1000);
-    new PropertyReference<uint32_t>("dwm1000/count",_count,  20000);
-    new PropertyReference<uint32_t>("dwm1000/errs",_errs,  20000);
-    new PropertyReference<uint32_t>("dwm1000/missed",_missed,  20000);
-    _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  60000);
-    
+    new PropertyReference<const char*>("dwm1000/role",role,  5000);
+    new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  5000);
+    new PropertyReference<uint32_t>("dwm1000/polls",_polls,  5000);
+    new PropertyReference<uint32_t>("dwm1000/responses",_resps,  5000);
+    new PropertyReference<uint32_t>("dwm1000/finals",_finals,  5000);
+    new PropertyReference<uint32_t>("dwm1000/blinks",_blinks,  5000);
+    new PropertyReference<uint32_t>("dwm1000/interruptDelay",_interruptDelay,  5000);
+    new PropertyReference<uint32_t>("dwm1000/count",_count,  5000);
+    new PropertyReference<uint32_t>("dwm1000/errs",_errs,  5000);
+    new PropertyReference<uint32_t>("dwm1000/missed",_missed,  5000);
+    _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  30000);
+
     VerticleTask::start();
 }
 
 void DWM1000_Anchor::run()
 {
     INFO(" anchor >>> ");
-    static uint32_t oldInterrupts;
+    static uint32_t oldInterrupts,oldPolls;
     uint32_t sys_mask, sys_status, sys_state,retries;
 
 INIT: {
@@ -181,24 +181,39 @@ INIT: {
         dwt_rxenable(0);
         oldInterrupts=_interrupts;
         retries=0;
+        oldPolls=0;
+        oldInterrupts=0;
     }
 ENABLE : {
         while(true) {
+            oldInterrupts = _interrupts;
+            oldPolls=_polls;
+
             waitSignal(1000);
+
             if ( hasSignal(SIG_INTERRUPT)) {
                 _interruptDelay = Sys::micros()-_interruptStart;
                 dwt_isr();
                 continue;
             }
+            if ( _irq.read() ) {
+                dwt_isr();
+            }
             sys_mask = dwt_read32bitreg(SYS_MASK_ID);
             sys_status = dwt_read32bitreg(SYS_STATUS_ID);
             sys_state = dwt_read32bitreg(SYS_STATE_ID);
-            if ( sys_state & 0x10000 ) { // IDLE
+
+            INFO(
+                " SYS_MASK : %X SYS_STATUS : %X SYS_STATE: %X state : %s IRQ : %d",
+                sys_mask, sys_status, sys_state, UID.label(_state),
+                _irq.read());
+                
+            if ( sys_state == 0x10000 ) { // IDLE
                 dwt_rxenable(0);
             }
-            if ((sys_status & SYS_STATUS_SLP2INIT) && (oldInterrupts == _interrupts) ) {
+            if ((oldInterrupts == _interrupts) || ( oldPolls==_polls))  {
                 retries++;
-                if ( retries == 10 ) {
+                if ( retries == 20 ) {
                     WARN(" Re-initializing DWM1000 ...")
                     DWM1000::init();
                     init();
@@ -210,19 +225,6 @@ ENABLE : {
                 }
             }
 
-            if ( oldInterrupts == _interrupts) {
-                INFO(
-                    " SYS_MASK : %X SYS_STATUS : %X SYS_STATE: %X state : %s IRQ : %d",
-                    sys_mask, sys_status, sys_state, UID.label(_state),
-                    _irq.read());
-                dwt_setrxtimeout(0);
-                dwt_rxenable(0);
-
-            }
-            if ( _irq.read() ) {
-                dwt_isr();
-            }
-            oldInterrupts = _interrupts;
             INFO(
                 " interrupts : %d blinks : %d polls : %d resps : %d finals :%d heap : %d dist : %f",
                 _interrupts, _blinks, _polls, _resps, _finals,Sys::getFreeHeap(),_distance);
@@ -372,12 +374,15 @@ WAIT_RXD: {
 //                   WARN(" unexpected frame type %s",UID.label(ft));
                 }
             } else if (signal->event == DWT_SIG_RX_TIMEOUT) {
+                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXRFTO); // Clear RX timeout event bit
                 if (_blinkTimer.expired()) {
                     sendBlinkMsg();
                     _blinks++;
                     _blinkTimer.reset();
                 }
             } else if (signal->event == DWT_SIG_TX_DONE  ) {
+                _errs+=100000000;
+                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_TX); // Clear TX event bit
             } else {
                 _errs+=1000000;
                 WARN("unhandled event %d",signal->event);
