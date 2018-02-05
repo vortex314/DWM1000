@@ -303,6 +303,7 @@ void DWM1000::createFinalMsg(FinalMsg& finalMsg, RespMsg& respMsg)
 
 void DWM1000::setShortAddress(uint16_t address)
 {
+    INFO(" DWM1000 short address : %X ",address);
     _shortAddress = address;
 }
 

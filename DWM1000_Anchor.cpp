@@ -235,7 +235,9 @@ ENABLE : {
 void DWM1000_Anchor::sendBlinkMsg()
 {
     int erc;
+    uint32_t dist=_distance*100;
     createBlinkFrame(_blinkMsg);
+    little_endian(_blinkMsg.distance,dist);
     dwt_writetxdata(sizeof(_blinkMsg), _blinkMsg.buffer, 0);
     dwt_writetxfctrl(sizeof(_blinkMsg), 0);
     erc = dwt_starttx(DWT_START_TX_IMMEDIATE );
