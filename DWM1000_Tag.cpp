@@ -247,7 +247,7 @@ bool DWM1000_Tag::pollAnchors()
                 _currentAnchor = anchors[i]._address;
                 createPollMsg(_pollMsg,_currentAnchor,_sequence);
                 if ( sendPollMsg() < 0 ) WARN("POLL failed");
-                INFO("poll %X : %d",_currentAnchor,_pollMsg.sequence);
+                DEBUG("poll %X : %d",_currentAnchor,_pollMsg.sequence);
                 return true;
             }
         }
@@ -304,7 +304,7 @@ WAIT_RESP: {
                 createFinalMsg(_finalMsg, _respMsg);
                 _finals++;
                 sendFinalMsg();
-                INFO("final %X : %d",_finalMsg.getDst(),_finalMsg.sequence);
+                DEBUG("final %X : %d",_finalMsg.getDst(),_finalMsg.sequence);
             } else if (ft == FT_BLINK) {
                 handleBlinkMsg(); // damn interfering blink, let's retry
                 _blinks++;
@@ -348,26 +348,26 @@ FrameType DWM1000_Tag::readMsg(const dwt_callback_data_t* signal)
         FrameType ft = DWM1000::getFrameType(_dwmMsg);
         if (ft == FT_BLINK) {
             memcpy(_blinkMsg.buffer, _dwmMsg.buffer, sizeof(_blinkMsg));
-            INFO(" blink %X : %d : %s",_blinkMsg.getSrc(),_blinkMsg.sequence,UID.label(_state));
+            DEBUG(" blink %X : %d : %s",_blinkMsg.getSrc(),_blinkMsg.sequence,UID.label(_state));
             _blinks++;
         } else if (ft == FT_POLL) {
             memcpy(_pollMsg.buffer, _dwmMsg.buffer, sizeof(_pollMsg));
-            INFO(" poll %X : %d : %s",_pollMsg.getSrc(),_pollMsg.sequence,UID.label(_state));
+            DEBUG(" poll %X : %d : %s",_pollMsg.getSrc(),_pollMsg.sequence,UID.label(_state));
             _polls++;
         } else if (ft == FT_RESP) {
             memcpy(_respMsg.buffer, _dwmMsg.buffer, sizeof(_respMsg));
-            INFO(" resp %X : %d : %s ",_respMsg.getSrc(),_respMsg.sequence,UID.label(_state));
+            DEBUG(" resp %X : %d : %s ",_respMsg.getSrc(),_respMsg.sequence,UID.label(_state));
             _resps++;
         } else if (ft == FT_FINAL) {
             memcpy(_finalMsg.buffer, _dwmMsg.buffer, sizeof(_finalMsg));
-            INFO(" final %X : %d : %s",_finalMsg.getSrc(),_finalMsg.sequence,UID.label(_state));
+            DEBUG(" final %X : %d : %s",_finalMsg.getSrc(),_finalMsg.sequence,UID.label(_state));
             _finals++;
         } else {
-            INFO(" unknown frame type %X:%X : %s",_dwmMsg.fc[0],_dwmMsg.fc[1],UID.label(_state));
+            DEBUG(" unknown frame type %X:%X : %s",_dwmMsg.fc[0],_dwmMsg.fc[1],UID.label(_state));
         }
         return ft;
     } else {
-        INFO(" invalid length %d : hdr %X:%X : %s",frameLength,_dwmMsg.fc[0],_dwmMsg.fc[1],UID.label(_state));
+        WARN(" invalid length %d : hdr %X:%X : %s",frameLength,_dwmMsg.fc[0],_dwmMsg.fc[1],UID.label(_state));
         return FT_UNKNOWN;
     }
 }
