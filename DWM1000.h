@@ -83,6 +83,7 @@ public:
      uint32_t _polls;
      bool interrupt_detected;
      */
+    
 
     uint8_t _longAddress[8];
     uint16_t _shortAddress;
@@ -100,6 +101,7 @@ public:
     typedef enum  {
         RCV_ANY = H("RCV_ANY"), RCV_RESP = H("SND_POLL")
     } State;
+    
 
 
 public:

@@ -105,7 +105,8 @@ DWM1000_Anchor::DWM1000_Anchor(const char* name,Spi& spi, DigitalIn& irq,Digital
     // PIN_IRQ_IN 4// PIN == D2 == GPIO4
     _panAddress(3),
     _irqEvent(100),
-    _blinkTimer(3000)
+    _blinkTimer(3000),
+    _role(2)
 {
 
     _count = 0;
@@ -119,6 +120,7 @@ DWM1000_Anchor::DWM1000_Anchor(const char* name,Spi& spi, DigitalIn& irq,Digital
     _anchor = this;
     _hasIrqEvent = false;
     _state = RCV_ANY;
+    _role="A";
     irq.onChange(DigitalIn::DIN_RAISE,anchorInterruptHandler,this);
 //    new PropertyReference<float>("dwm1000/distance",distanceProp,1000);
 }
@@ -153,17 +155,19 @@ void DWM1000_Anchor::start()
         signal(SIG_MESSAGE);
     });
 
-    new PropertyReference<const char*>("dwm1000/role",role,  5000);
-    new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  5000);
-    new PropertyReference<uint32_t>("dwm1000/polls",_polls,  5000);
-    new PropertyReference<uint32_t>("dwm1000/responses",_resps,  5000);
-    new PropertyReference<uint32_t>("dwm1000/finals",_finals,  5000);
-    new PropertyReference<uint32_t>("dwm1000/blinks",_blinks,  5000);
-    new PropertyReference<uint32_t>("dwm1000/interruptDelay",_interruptDelay,  5000);
-    new PropertyReference<uint32_t>("dwm1000/count",_count,  5000);
-    new PropertyReference<uint32_t>("dwm1000/errs",_errs,  5000);
-    new PropertyReference<uint32_t>("dwm1000/missed",_missed,  5000);
-    _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  30000);
+    new PropertyFunction<const char*>("dwm1000/role",[this]() {
+        return _role.c_str();
+    },  5000);
+    new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  -5000);
+    new PropertyReference<uint32_t>("dwm1000/polls",_polls,  -5000);
+    new PropertyReference<uint32_t>("dwm1000/responses",_resps,  -5000);
+    new PropertyReference<uint32_t>("dwm1000/finals",_finals,  -5000);
+    new PropertyReference<uint32_t>("dwm1000/blinks",_blinks,  -5000);
+    new PropertyReference<uint32_t>("dwm1000/interruptDelay",_interruptDelay,  -5000);
+    new PropertyReference<uint32_t>("dwm1000/count",_count,  -5000);
+    new PropertyReference<uint32_t>("dwm1000/errs",_errs,  -5000);
+    new PropertyReference<uint32_t>("dwm1000/missed",_missed,  -5000);
+    _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  5000);
 
     VerticleTask::start();
 }
@@ -207,7 +211,7 @@ ENABLE : {
                 " SYS_MASK : %X SYS_STATUS : %X SYS_STATE: %X state : %s IRQ : %d",
                 sys_mask, sys_status, sys_state, UID.label(_state),
                 _irq.read());
-                
+
             if ( sys_state == 0x10000 ) { // IDLE
                 dwt_rxenable(0);
             }

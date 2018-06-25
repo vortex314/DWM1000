@@ -104,6 +104,7 @@ class DWM1000_Tag: public  VerticleTask,public DWM1000
     uint16_t _currentAnchor;
     State _state;
     Timeout _pollTimer;
+    Str _role;
 public:
     uint64_t _interruptStart;
     DWM1000_Tag(const char* name,Spi& spi,DigitalIn& irq,DigitalOut& reset);

@@ -13,6 +13,6 @@ INC_DIRS += $(DWM1000_ROOT)
 DWM1000_SRC_DIR =  $(DWM1000_ROOT)
 DWM1000_CFLAGS= -DESP_OPEN_RTOS 
 DWM1000_CXXFLAGS= -fno-threadsafe-statics -std=c++11 -fno-rtti -lstdc++ -fno-exceptions
-DWM1000_INC_DIR= ../etl/src
+DWM1000_INC_DIR= ../etl/src ../Common
 
 $(eval $(call component_compile_rules,DWM1000))

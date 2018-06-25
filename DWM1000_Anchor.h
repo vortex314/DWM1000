@@ -50,7 +50,7 @@ class DWM1000_Anchor: public VerticleTask,public DWM1000
     State _state;
     Timeout _blinkTimer;
     PropertyReference<float>* _distanceProp;
-
+    Str _role;
 
 public:
     uint64_t _interruptStart;

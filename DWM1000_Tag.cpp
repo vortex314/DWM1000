@@ -95,7 +95,6 @@ enum {
     SIG_MESSAGE,
     SIG_INTERRUPT
 };
-static const char* role="T";
 
 void tagInterruptHandler(void* obj)
 {
@@ -112,7 +111,7 @@ DWM1000_Tag::DWM1000_Tag(const char* name,Spi& spi,DigitalIn& irq,DigitalOut& re
     VerticleTask(name,500,16),DWM1000( spi,irq,reset),
 //int pin = 5;   // RESET PIN == D1 == GPIO5
     // PIN_IRQ_IN 4// PIN == D2 == GPIO4
-    _anchors(20), _panAddress(3),_pollTimer(300)
+    _anchors(20), _panAddress(3),_pollTimer(300),_role(2)
 {
     _state = RCV_ANY;
 
@@ -126,6 +125,7 @@ DWM1000_Tag::DWM1000_Tag(const char* name,Spi& spi,DigitalIn& irq,DigitalOut& re
     _missed=0;
     _state = RCV_ANY;
     _tag=this;
+    _role="T";
     irq.onChange(DigitalIn::DIN_RAISE,tagInterruptHandler,this);
 
 }
@@ -395,7 +395,10 @@ void DWM1000_Tag::start()
         signal(SIG_MESSAGE);
     });
 
-    new PropertyReference<const char*>("dwm1000/role",role,  5000);
+    new PropertyFunction<const char*>("dwm1000/role",[this]() {
+        return _role.c_str();
+    },  5000);
+
     new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  5000);
     new PropertyReference<uint32_t>("dwm1000/polls",_polls,  5000);
     new PropertyReference<uint32_t>("dwm1000/responses",_resps,  5000);
