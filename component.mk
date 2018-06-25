@@ -7,7 +7,7 @@
 # Component makefile for extras/DWM1000
 
 # expected anyone using bmp driver includes it as 'DWM1000/MQTT*.h'
-INC_DIRS += $(DWM1000_ROOT) 
+INC_DIRS += $(DWM1000_ROOT) ../Common 
 
 # args for passing into compile rule generation
 DWM1000_SRC_DIR =  $(DWM1000_ROOT)
