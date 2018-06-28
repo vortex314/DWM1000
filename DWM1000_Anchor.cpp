@@ -98,7 +98,7 @@ void anchorInterruptHandler(void* obj)
 }
 
 DWM1000_Anchor::DWM1000_Anchor(const char* name,Spi& spi, DigitalIn& irq,DigitalOut& reset) :
-    VerticleTask(name,500,16),DWM1000( spi,irq,reset),
+    VerticleTask(name,1024,16),DWM1000( spi,irq,reset),
 //int pin = 5;   // RESET PIN == D1 == GPIO5
 //    Actor(name),
 
@@ -158,6 +158,24 @@ void DWM1000_Anchor::start()
     new PropertyFunction<const char*>("dwm1000/role",[this]() {
         return _role.c_str();
     },  5000);
+	new PropertyWriteFunction<int>("dwm1000/x",[this]() {
+		return _x;
+    },[this](int x) {
+		config.setNameSpace("dwm1000");
+		config.set("x",x);
+		_x=x;
+		config.save();
+		return E_OK;
+    },  5000);
+	new PropertyWriteFunction<int>("dwm1000/y",[this]() {
+		return _y;
+    },[this](int y) {
+		config.setNameSpace("dwm1000");
+		config.set("y",y);
+		_y=y;
+		config.save();
+		return E_OK;
+    },  5000);
     new PropertyReference<uint32_t>("dwm1000/interrupts",_interrupts,  -5000);
     new PropertyReference<uint32_t>("dwm1000/polls",_polls,  -5000);
     new PropertyReference<uint32_t>("dwm1000/responses",_resps,  -5000);
@@ -167,6 +185,7 @@ void DWM1000_Anchor::start()
     new PropertyReference<uint32_t>("dwm1000/count",_count,  -5000);
     new PropertyReference<uint32_t>("dwm1000/errs",_errs,  -5000);
     new PropertyReference<uint32_t>("dwm1000/missed",_missed,  -5000);
+	_distance=0; // otherwise stack overflow because large number of zeros, float to string breaks
     _distanceProp = new PropertyReference<float>("dwm1000/distance",_distance,  5000);
 
     VerticleTask::start();
